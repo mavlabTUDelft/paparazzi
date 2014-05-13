@@ -158,7 +158,7 @@
 
     <define name="REF_OMEGA_R" value="300" unit="deg/s"/>
     <define name="REF_ZETA_R" value="0.9"/>
-    <define name="REF_MAX_R" value="200." unit="deg/s"/>
+    <define name="REF_MAX_R" value="300." unit="deg/s"/>
     <define name="REF_MAX_RDOT" value="RadOfDeg(4000.)"/>
 
     <!-- feedback -->
