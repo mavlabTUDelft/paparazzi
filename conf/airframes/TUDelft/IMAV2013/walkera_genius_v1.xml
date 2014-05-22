@@ -160,10 +160,6 @@
    <define name="IGAIN" value="0"/>
  </section>
 
- <section name="MISC">
-   <define name="FACE_REINJ_1" value="1024"/>
- </section>
-
  <modules main_freq="512">
    <load name="gps_ubx_ucenter.xml"/>
    <load name="send_imu_mag_current.xml"/>
@@ -178,7 +174,6 @@
       </subsystem>
 
       <configure name="AHRS_PROPAGATE_FREQUENCY" value="500"/>
-      <configure name="LISA_S_BARO" value="BARO_MS5611_SPI"/>
     </target>
 
     <subsystem name="actuators" type="pwm">

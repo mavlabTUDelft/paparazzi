@@ -83,8 +83,9 @@ int32_t nav_roll, nav_pitch;
 int32_t nav_heading, nav_course;
 float nav_radius;
 
+/** default nav_circle_radius in meters */
 #ifndef DEFAULT_CIRCLE_RADIUS
-#define DEFAULT_CIRCLE_RADIUS 0.
+#define DEFAULT_CIRCLE_RADIUS 5.
 #endif
 
 uint8_t vertical_mode;
@@ -95,8 +96,12 @@ float flight_altitude;
 static inline void nav_set_altitude( void );
 
 #define CLOSE_TO_WAYPOINT (15 << 8)
-#define ARRIVED_AT_WAYPOINT (3 << 8)
 #define CARROT_DIST (12 << 8)
+
+/** minimum horizontal distance to waypoint to mark as arrived */
+#ifndef ARRIVED_AT_WAYPOINT
+#define ARRIVED_AT_WAYPOINT 3.0
+#endif
 
 #if PERIODIC_TELEMETRY
 #include "subsystems/datalink/telemetry.h"
@@ -289,23 +294,45 @@ void nav_route(uint8_t wp_start, uint8_t wp_end) {
   horizontal_mode = HORIZONTAL_MODE_ROUTE;
 }
 
-bool_t nav_approaching_from(uint8_t wp_idx, uint8_t from_idx) {
+bool_t nav_approaching_from(uint8_t wp_idx, uint8_t from_idx, int16_t approaching_time) {
   int32_t dist_to_point;
   struct Int32Vect2 diff;
-  VECT2_DIFF(diff, waypoints[wp_idx], *stateGetPositionEnu_i());
-  INT32_VECT2_RSHIFT(diff, diff, INT32_POS_FRAC);
+  struct EnuCoor_i* pos = stateGetPositionEnu_i();
+
+  /* if an approaching_time is given, estimate diff after approching_time secs */
+  if (approaching_time > 0) {
+    struct Int32Vect2 estimated_pos;
+    struct Int32Vect2 estimated_progress;
+    struct EnuCoor_i* speed = stateGetSpeedEnu_i();
+    VECT2_SMUL(estimated_progress, *speed, approaching_time);
+    INT32_VECT2_RSHIFT(estimated_progress, estimated_progress, (INT32_SPEED_FRAC - INT32_POS_FRAC));
+    VECT2_SUM(estimated_pos, *pos, estimated_progress);
+    VECT2_DIFF(diff, waypoints[wp_idx], estimated_pos);
+  }
+  /* else use current position */
+  else {
+    VECT2_DIFF(diff, waypoints[wp_idx], *pos);
+  }
+  /* compute distance of estimated/current pos to target wp
+   * distance with half metric precision (6.25 cm)
+   */
+  INT32_VECT2_RSHIFT(diff, diff, INT32_POS_FRAC/2);
   INT32_VECT2_NORM(dist_to_point, diff);
-  //printf("dist %d | %d %d\n", dist_to_point,diff.x,diff.y);
-  //fflush(stdout);
-  //if (dist_to_point < (ARRIVED_AT_WAYPOINT >> INT32_POS_FRAC)) return TRUE;
-  if (dist_to_point < (ARRIVED_AT_WAYPOINT >> INT32_POS_FRAC)) return TRUE;
+
+  /* return TRUE if we have arrived */
+  if (dist_to_point < BFP_OF_REAL(ARRIVED_AT_WAYPOINT, INT32_POS_FRAC/2))
+    return TRUE;
+
+  /* if coming from a valid waypoint */
   if (from_idx > 0 && from_idx < NB_WAYPOINT) {
+    /* return TRUE if normal line at the end of the segment is crossed */
     struct Int32Vect2 from_diff;
     VECT2_DIFF(from_diff, waypoints[wp_idx], waypoints[from_idx]);
-    INT32_VECT2_RSHIFT(from_diff, from_diff, INT32_POS_FRAC);
+    INT32_VECT2_RSHIFT(from_diff, from_diff, INT32_POS_FRAC/2);
     return (diff.x * from_diff.x + diff.y * from_diff.y < 0);
   }
-  else return FALSE;
+
+  return FALSE;
 }
 
 bool_t nav_check_wp_time(uint8_t wp_idx, uint16_t stay_time) {
@@ -316,15 +343,15 @@ bool_t nav_check_wp_time(uint8_t wp_idx, uint16_t stay_time) {
   static uint8_t wp_idx_last = 0;
   struct Int32Vect2 diff;
 
-  if(wp_idx_last != wp_idx) {
+  if (wp_idx_last != wp_idx) {
     wp_reached = FALSE;
     wp_idx_last = wp_idx;
   }
   VECT2_DIFF(diff, waypoints[wp_idx], *stateGetPositionEnu_i());
-  INT32_VECT2_RSHIFT(diff, diff, INT32_POS_FRAC);
+  INT32_VECT2_RSHIFT(diff, diff, INT32_POS_FRAC/2);
   INT32_VECT2_NORM(dist_to_point, diff);
-  if (dist_to_point < (ARRIVED_AT_WAYPOINT >> INT32_POS_FRAC)){
-    if(!wp_reached) {
+  if (dist_to_point < BFP_OF_REAL(ARRIVED_AT_WAYPOINT, INT32_POS_FRAC/2)){
+    if (!wp_reached) {
       wp_reached = TRUE;
       wp_entry_time = autopilot_flight_time;
       time_at_wp = 0;
@@ -453,4 +480,36 @@ void compute_dist2_to_home(void) {
   INT32_VECT2_RSHIFT(home_d, home_d, INT32_POS_FRAC);
   dist2_to_home = (float)(home_d.x * home_d.x + home_d.y * home_d.y);
   too_far_from_home = dist2_to_home > max_dist2_from_home;
+}
+
+/** Set nav_heading in degrees. */
+bool_t nav_set_heading_rad(float rad) {
+  nav_heading = ANGLE_BFP_OF_REAL(rad);
+  INT32_COURSE_NORMALIZE(nav_heading);
+  return FALSE;
+}
+
+/** Set nav_heading in degrees. */
+bool_t nav_set_heading_deg(float deg) {
+  return nav_set_heading_rad(RadOfDeg(deg));
+}
+
+/** Set heading to point towards x,y position in local coordinates */
+bool_t nav_set_heading_towards(float x, float y) {
+  struct FloatVect2 target = {x, y};
+  struct FloatVect2 pos_diff;
+  VECT2_DIFF(pos_diff, target, *stateGetPositionEnu_f());
+  // don't change heading if closer than 0.5m to target
+  if (FLOAT_VECT2_NORM2(pos_diff) > 0.25) {
+    float heading_f = atan2f(pos_diff.x, pos_diff.y);
+    nav_heading = ANGLE_BFP_OF_REAL(heading_f);
+  }
+  // return false so it can be called from the flightplan
+  // meaning it will continue to the next stage
+  return FALSE;
+}
+
+/** Set heading in the direction of a waypoint */
+bool_t nav_set_heading_towards_waypoint(uint8_t wp) {
+  return nav_set_heading_towards(WaypointX(wp), WaypointY(wp));
 }

@@ -81,6 +81,7 @@ static inline void __enable_irq(void)   { asm volatile ("cpsie i"); }
 #define NVIC_I2C3_IRQ_PRIO NVIC_I2C_IRQ_PRIO
 #endif
 
+#if USE_I2C1 || USE_I2C2 || USE_I2C3
 #if defined(STM32F1)
 static void i2c_setup_gpio(uint32_t i2c) {
   switch (i2c) {
@@ -150,6 +151,7 @@ static void i2c_setup_gpio(uint32_t i2c) {
   }
 }
 #endif
+#endif // USE_I2Cx
 
 static inline void PPRZ_I2C_SEND_STOP(uint32_t i2c)
 {
@@ -950,11 +952,11 @@ I2C_SoftwareResetCmd(periph->reg_addr, DISABLE);
 */
 
 
-#ifdef USE_I2C0
+#if USE_I2C0
 #error "The STM32 doesn't have I2C0, use I2C1 or I2C2"
 #endif
 
-#ifdef USE_I2C1
+#if USE_I2C1
 
 /** default I2C1 clock speed */
 #ifndef I2C1_CLOCK_SPEED
@@ -1033,7 +1035,7 @@ void i2c1_er_isr(void) {
 
 #endif /* USE_I2C1 */
 
-#ifdef USE_I2C2
+#if USE_I2C2
 
 /** default I2C2 clock speed */
 #ifndef I2C2_CLOCK_SPEED
@@ -1108,7 +1110,7 @@ void i2c2_er_isr(void) {
 #endif /* USE_I2C2 */
 
 
-#if defined USE_I2C3 && defined STM32F4
+#if USE_I2C3 && defined STM32F4
 
 /** default I2C3 clock speed */
 #ifndef I2C3_CLOCK_SPEED
@@ -1277,7 +1279,7 @@ void i2c_setbitrate(struct i2c_periph *periph, int bitrate)
   }
 }
 
-
+#if USE_I2C1 || USE_I2C2 || USE_I2C3
 static inline void i2c_scl_set(uint32_t i2c) {
 #if USE_I2C1
   if (i2c == I2C1)
@@ -1306,7 +1308,7 @@ static inline void i2c_scl_clear(uint32_t i2c) {
   if (i2c == I2C3)
     gpio_clear(I2C3_GPIO_PORT_SCL, I2C3_GPIO_SCL);
 #endif
-  }
+}
 
 #define WD_DELAY 20           // number of ticks with 2ms - 40ms delay before resetting the bus
 #define WD_RECOVERY_TICKS 10  // number of generated SCL clocking pulses
@@ -1338,7 +1340,7 @@ static void i2c_wd_check(struct i2c_periph *periph) {
       if (i2c == I2C3) {
         gpio_setup_output(I2C3_GPIO_PORT_SCL, I2C3_GPIO_SCL);
         gpio_setup_input(I2C3_GPIO_PORT_SDA,I2C3_GPIO_SDA);
-  }
+      }
 #endif
 
       i2c_scl_clear(i2c);
@@ -1368,11 +1370,13 @@ static void i2c_wd_check(struct i2c_periph *periph) {
       periph->errors->timeout_tlow_cnt++;
 
       return;
-      }
     }
+  }
   if (periph->watchdog >= 0)
     periph->watchdog++;
-  }
+}
+#endif // USE_I2Cx
+
 #include "mcu_periph/sys_time.h"
 
 void i2c_event(void) {
@@ -1380,14 +1384,14 @@ void i2c_event(void) {
 
   if (SysTimeTimer(i2c_wd_timer) > 2000) { // 2ms (500Hz) periodic watchdog check
     SysTimeTimerStart(i2c_wd_timer);
-#ifdef USE_I2C1
+#if USE_I2C1
     i2c_wd_check(&i2c1);
 #endif
 
-#ifdef USE_I2C2
+#if USE_I2C2
     i2c_wd_check(&i2c2);
 #endif
-#ifdef USE_I2C3
+#if USE_I2C3
     i2c_wd_check(&i2c3);
 #endif
   }
@@ -1422,7 +1426,7 @@ bool_t i2c_submit(struct i2c_periph* periph, struct i2c_transaction* t) {
     //if (i2c_idle(periph))
     {
 #ifdef I2C_DEBUG_LED
-#ifdef USE_I2C1
+#if USE_I2C1
       if (periph == &i2c1)
       {
 
@@ -1453,7 +1457,7 @@ bool_t i2c_idle(struct i2c_periph* periph)
   uint32_t i2c = (uint32_t) periph->reg_addr;
 
 #ifdef I2C_DEBUG_LED
-#ifdef USE_I2C1
+#if USE_I2C1
   if (periph == &i2c1)
   {
     return TRUE;
