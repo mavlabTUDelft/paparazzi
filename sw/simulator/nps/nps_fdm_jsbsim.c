@@ -30,7 +30,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+// ignore stupid warnings in JSBSim
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <FGFDMExec.h>
+#pragma GCC diagnostic pop
+
 #include <FGJSBBase.h>
 #include <models/FGPropulsion.h>
 #include <models/FGGroundReactions.h>
@@ -43,6 +47,8 @@
 #include "math/pprz_geodetic_float.h"
 #include "math/pprz_algebra.h"
 #include "math/pprz_algebra_float.h"
+
+#include "math/pprz_geodetic_wmm2010.h"
 
 #include "generated/airframe.h"
 #include "generated/flight_plan.h"
@@ -385,6 +391,9 @@ static void init_jsbsim(double dt) {
   //initRunning for all engines
   FDMExec->GetPropulsion()->InitRunning(-1);
 
+  // LLA initial coordinates (geodetic lat, geoid alt)
+  struct LlaCoor_d lla0;
+
   JSBSim::FGInitialCondition *IC = FDMExec->GetIC();
   if(!jsbsim_ic_name.empty()) {
     if ( ! IC->Load(jsbsim_ic_name)) {
@@ -394,6 +403,8 @@ static void init_jsbsim(double dt) {
       delete FDMExec;
       exit(-1);
     }
+
+    llh_from_jsbsim(&lla0, FDMExec->GetPropagate());
   }
   else {
     // FGInitialCondition::SetAltitudeASLFtIC
@@ -421,16 +432,19 @@ static void init_jsbsim(double dt) {
       exit(-1);
     }
 
-    // compute offset between geocentric and geodetic ecef
-    struct LlaCoor_d lla0 = { RadOfDeg(NAV_LON0 / 1e7), gd_lat, (double)(NAV_ALT0+NAV_MSL0)/1000. };
-    ecef_of_lla_d(&offset, &lla0);
-    struct EcefCoor_d ecef0 = {
-      MetersOfFeet(FDMExec->GetPropagate()->GetLocation().Entry(1)),
-      MetersOfFeet(FDMExec->GetPropagate()->GetLocation().Entry(2)),
-      MetersOfFeet(FDMExec->GetPropagate()->GetLocation().Entry(3))
-    };
-    VECT3_DIFF(offset, offset, ecef0);
+    lla0.lon = RadOfDeg(NAV_LON0 / 1e7);
+    lla0.lat = gd_lat;
+    lla0.alt = (double)(NAV_ALT0+NAV_MSL0)/1000.0;
   }
+
+  // compute offset between geocentric and geodetic ecef
+  ecef_of_lla_d(&offset, &lla0);
+  struct EcefCoor_d ecef0 = {
+    MetersOfFeet(FDMExec->GetPropagate()->GetLocation().Entry(1)),
+    MetersOfFeet(FDMExec->GetPropagate()->GetLocation().Entry(2)),
+    MetersOfFeet(FDMExec->GetPropagate()->GetLocation().Entry(3))
+  };
+  VECT3_DIFF(offset, offset, ecef0);
 
   // calculate vehicle max radius in m
   vehicle_radius_max = 0.01; // specify not 0.0 in case no gear
@@ -447,34 +461,52 @@ static void init_jsbsim(double dt) {
 /**
  * Initialize the ltp from the JSBSim location.
  *
- * @todo The magnetic field is hardcoded, make location dependent
- * (might be able to use JSBSim sensors)
  */
 static void init_ltp(void) {
 
   FGPropagate* propagate = FDMExec->GetPropagate();
 
-  jsbsimloc_to_loc(&fdm.ecef_pos,&propagate->GetLocation());
-  ltp_def_from_ecef_d(&ltpdef,&fdm.ecef_pos);
+  jsbsimloc_to_loc(&fdm.ecef_pos, &propagate->GetLocation());
+  ltp_def_from_ecef_d(&ltpdef, &fdm.ecef_pos);
 
   fdm.ltp_g.x = 0.;
   fdm.ltp_g.y = 0.;
   fdm.ltp_g.z = 9.81;
 
-#ifdef AHRS_H_X
+
+#if !NPS_CALC_GEO_MAG && defined(AHRS_H_X)
 #pragma message "Using magnetic field as defined in airframe file (AHRS section)."
   fdm.ltp_h.x = AHRS_H_X;
   fdm.ltp_h.y = AHRS_H_Y;
   fdm.ltp_h.z = AHRS_H_Z;
-#elif defined INS_H_X
+#elif !NPS_CALC_GEO_MAG && defined(INS_H_X)
 #pragma message "Using magnetic field as defined in airframe file (INS section)."
   fdm.ltp_h.x = INS_H_X;
   fdm.ltp_h.y = INS_H_Y;
   fdm.ltp_h.z = INS_H_Z;
 #else
-  fdm.ltp_h.x = 0.4912;
-  fdm.ltp_h.y = 0.1225;
-  fdm.ltp_h.z = 0.8624;
+#pragma message "Using WMM2010 model to calculate magnetic field at simulated location."
+  /* calculation of magnetic field according to WMM2010 model */
+  double gha[MAXCOEFF];
+
+  /* Current date in decimal year, for example 2012.68 */
+  /** @FIXME properly get current time */
+  double sdate = 2014.5;
+
+  llh_from_jsbsim(&fdm.lla_pos, propagate);
+  /* LLA Position in decimal degrees and altitude in km */
+  double latitude = DegOfRad(fdm.lla_pos.lat);
+  double longitude = DegOfRad(fdm.lla_pos.lon);
+  double alt = fdm.lla_pos.alt / 1e3;
+
+  // Calculates additional coeffs
+  int32_t nmax = extrapsh(sdate, GEO_EPOCH, NMAX_1, NMAX_2, gha);
+  // Calculates absolute magnetic field
+  mag_calc(1, latitude, longitude, alt, nmax, gha,
+           &fdm.ltp_h.x, &fdm.ltp_h.y, &fdm.ltp_h.z,
+           IEXT, EXT_COEFF1, EXT_COEFF2, EXT_COEFF3);
+  FLOAT_VECT3_NORMALIZE(fdm.ltp_h);
+  printf("normalized magnetic field: %.4f %.4f %.4f\n", fdm.ltp_h.x, fdm.ltp_h.y, fdm.ltp_h.z);
 #endif
 
 }

@@ -83,6 +83,7 @@
      <field name="utm_east"  type="int32" unit="m"/>
      <field name="utm_north" type="int32" unit="m"/>
      <field name="utm_zone" type="uint8"/>
+     <field name="ground_alt" type="float" unit="m"/>
    </message>
 
    <message name="NAVIGATION" id="10">
@@ -1379,8 +1380,8 @@
     <field name="ecef_xd" type="int32" unit="cm/s" alt_unit="m/s"/>
     <field name="ecef_yd" type="int32" unit="cm/s" alt_unit="m/s"/>
     <field name="ecef_zd" type="int32" unit="cm/s" alt_unit="m/s"/>
-    <field name="pacc"    type="int32" unit="cm"   alt_unit="m"/>
-    <field name="sacc"    type="int32" unit="cm/s" alt_unit="m/s"/>
+    <field name="pacc"    type="uint32" unit="cm"   alt_unit="m"/>
+    <field name="sacc"    type="uint32" unit="cm/s" alt_unit="m/s"/>
     <field name="tow"     type="uint32"/>
     <field name="pdop"    type="uint16"/>
     <field name="numsv"   type="uint8"/>
@@ -2718,6 +2719,7 @@
     <field name="lat"  type="float" unit="deg"></field>
     <field name="long"  type="float" unit="deg"></field>
     <field name="alt" type="float" unit="m"></field>
+    <field name="ground_alt" type="float" unit="m"/>
  </message>
 
   <message name="SURVEY_STATUS" id="31">

@@ -2,7 +2,7 @@
 
 <!-- Microjet Multiplex (http://www.multiplex-rc.de/)
      Lisa/M v2.0 board (http://paparazzi.enac.fr/wiki/Lisa/M_v20)
-     Aspirin IMU v2.1
+     Aspirin IMU v2.2 with MS5611 barometer
      Xbee modem in transparent mode
 -->
 
@@ -14,29 +14,33 @@
       <subsystem name="fdm" type="jsbsim"/>
     </target>
     <target name="ap"   board="lisa_m_2.0">
+      <configure name="LISA_M_BARO" value="BARO_MS5611_SPI"/>
       <configure name="PERIODIC_FREQUENCY" value="120"/>
       <configure name="AHRS_PROPAGATE_FREQUENCY" value="100"/>
       <configure name="AHRS_CORRECT_FREQUENCY" value="100"/>
     </target>
 
+    <configure name="USE_MAGNETOMETER" value="FALSE"/>
+
     <define name="AGR_CLIMB"/>
     <define name="LOITER_TRIM"/>
     <define name="STRONG_WIND"/>
 
-    <define name="USE_BAROMETER" value="TRUE"/>
     <subsystem name="radio_control" type="ppm"/>
 
     <!-- Communication -->
     <subsystem name="telemetry" 	type="transparent"/>
 
     <!-- Sensors -->
-    <subsystem name="imu"           type="aspirin_v2.1"/>
+    <subsystem name="imu"           type="aspirin_v2.2"/>
     <subsystem name="gps"           type="ublox"/>
 
     <subsystem name="ahrs"          type="int_cmpl_quat"/>
     <subsystem name="control"/>
     <subsystem name="navigation"/>
-    <subsystem name="ins" type="alt_float"/>
+    <subsystem name="ins" type="alt_float">
+      <define name="USE_BAROMETER" value="TRUE"/>
+    </subsystem>
   </firmware>
 
   <modules>
@@ -105,13 +109,6 @@
     <define name="BODY_TO_IMU_PHI"   value="0." unit="deg"/>
     <define name="BODY_TO_IMU_THETA" value="0." unit="deg"/>
     <define name="BODY_TO_IMU_PSI"   value="0." unit="deg"/>
-  </section>
-
-  <section name="AHRS" prefix="AHRS_">
-    <!-- replace this with your local magnetic field -->
-    <define name="H_X" value="0.3770441"/>
-    <define name="H_Y" value="0.0193986"/>
-    <define name="H_Z" value="0.9259921"/>
   </section>
 
   <section name="INS" prefix="INS_">

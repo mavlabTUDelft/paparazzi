@@ -96,7 +96,6 @@ void nav_init_stage( void ) {
   nav_in_circle = FALSE;
   nav_in_segment = FALSE;
   nav_shift = 0;
-  nav_pitch = 0.;
 }
 
 #define PowerVoltage() (vsupply/10.)
@@ -453,7 +452,7 @@ void nav_periodic_task(void) {
 
 static void send_nav_ref(void) {
   DOWNLINK_SEND_NAVIGATION_REF(DefaultChannel, DefaultDevice,
-      &nav_utm_east0, &nav_utm_north0, &nav_utm_zone0);
+      &nav_utm_east0, &nav_utm_north0, &nav_utm_zone0, &ground_alt);
 }
 
 static void send_nav(void) {
