@@ -76,9 +76,10 @@ let units_file = Env.paparazzi_src // "conf" // "units.xml"
 
 external float_of_bytes : string -> int -> float = "c_float_of_indexed_bytes"
 external double_of_bytes : string -> int -> float = "c_double_of_indexed_bytes"
-external int32_of_bytes : string -> int -> int32 = "c_int32_of_indexed_bytes"
 external int8_of_bytes : string -> int -> int = "c_int8_of_indexed_bytes"
 external int16_of_bytes : string -> int -> int = "c_int16_of_indexed_bytes"
+external int32_of_bytes : string -> int -> int32 = "c_int32_of_indexed_bytes"
+external uint32_of_bytes : string -> int -> int64 = "c_uint32_of_indexed_bytes"
 external int64_of_bytes : string -> int -> int64 = "c_int64_of_indexed_bytes"
 external sprint_float : string -> int -> float -> unit = "c_sprint_float"
 external sprint_double : string -> int -> float -> unit = "c_sprint_double"
@@ -141,7 +142,8 @@ let int_of_string = fun x ->
 let rec value = fun t v ->
   match t with
       Scalar ("uint8" | "uint16" | "int8" | "int16") -> Int (int_of_string v)
-    | Scalar ("uint32" | "int32") -> Int32 (Int32.of_string v)
+    | Scalar "int32" -> Int32 (Int32.of_string v)
+    | Scalar "uint32" -> Int64 (Int64.of_string v)
     | Scalar ("uint64" | "int64") -> Int64 (Int64.of_string v)
     | Scalar ("float" | "double") -> Float (float_of_string v)
     | Scalar "string" -> String v
@@ -299,12 +301,17 @@ let int_assoc = fun (a:string) vs ->
 let int32_assoc = fun (a:string) vs ->
   match assoc a vs with
       Int32 x -> x
-    | _ -> invalid_arg "Pprz.int_assoc"
+    | _ -> invalid_arg "Pprz.int32_assoc"
+
+let uint32_assoc = fun (a:string) vs ->
+  match assoc a vs with
+      Int64 x -> x
+    | _ -> invalid_arg "Pprz.uint32_assoc"
 
 let int64_assoc = fun (a:string) vs ->
   match assoc a vs with
     Int64 x -> x
-  | _ -> invalid_arg "Pprz.int_assoc"
+  | _ -> invalid_arg "Pprz.int64_assoc"
 
 let string_assoc = fun (a:string) (vs:values) -> string_of_value (assoc a vs)
 
@@ -351,7 +358,8 @@ let rec value_of_bin = fun buffer index _type ->
     | Scalar "int16" -> Int (int16_of_bytes buffer index), sizeof _type
     | Scalar "float" -> Float (float_of_bytes buffer index), sizeof _type
     | Scalar "double" -> Float (double_of_bytes buffer index), sizeof _type
-    | Scalar ("int32"  | "uint32") -> Int32 (int32_of_bytes buffer index), sizeof _type
+    | Scalar "int32" -> Int32 (int32_of_bytes buffer index), sizeof _type
+    | Scalar "uint32" -> Int64 (uint32_of_bytes buffer index), sizeof _type
     | Scalar ("int64"  | "uint64") -> Int64 (int64_of_bytes buffer index), sizeof _type
     | ArrayType t ->
       (** First get the number of values *)
@@ -392,8 +400,8 @@ let rec sprint_value = fun buf i _type v ->
       sprint_int8 buf i x; sizeof _type
     | Scalar "float", Float f -> sprint_float buf i f; sizeof _type
     | Scalar "double", Float f -> sprint_double buf i f; sizeof _type
-    | Scalar ("int32"|"uint32"), Int32 x -> sprint_int32 buf i x; sizeof _type
-    | Scalar ("int64"|"uint64"), Int64 x -> sprint_int64 buf i x; sizeof _type
+    | Scalar "int32", Int32 x -> sprint_int32 buf i x; sizeof _type
+    | Scalar ("int64"|"uint64"|"uint32"), Int64 x -> sprint_int64 buf i x; sizeof _type
     | Scalar "int16", Int x -> sprint_int16 buf i x; sizeof _type
     | Scalar ("int32" | "uint32"), Int value ->
       assert (_type <> Scalar "uint32" || value >= 0);
@@ -601,7 +609,8 @@ module MessagesOfXml(Class:CLASS_Xml) = struct
   let messages_by_id, messages_by_name =
     try
       let select = fun x -> Xml.attrib x "name" = Class.name in
-      parse_class (ExtXml.child Class.xml ~select "class")
+      let xml_class = try ExtXml.child Class.xml ~select "msg_class" with Not_found -> ExtXml.child Class.xml ~select "class" in
+      parse_class xml_class
     with
         Not_found -> failwith (sprintf "Unknown message class: %s" Class.name)
   let messages = messages_by_id

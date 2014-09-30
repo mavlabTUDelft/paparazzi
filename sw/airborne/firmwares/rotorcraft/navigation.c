@@ -56,7 +56,7 @@ struct EnuCoor_i navigation_carrot;
 
 struct EnuCoor_i nav_last_point;
 
-uint8_t last_wp __attribute__ ((unused));
+uint8_t last_wp UNUSED;
 
 /** Maximum distance from HOME waypoint before going into failsafe mode */
 #ifndef FAILSAFE_MODE_DISTANCE
@@ -68,6 +68,8 @@ const float max_dist2_from_home = MAX_DIST_FROM_HOME * MAX_DIST_FROM_HOME;
 float failsafe_mode_dist2 = FAILSAFE_MODE_DISTANCE * FAILSAFE_MODE_DISTANCE;
 float dist2_to_home;
 bool_t too_far_from_home;
+
+float dist2_to_wp;
 
 uint8_t horizontal_mode;
 struct EnuCoor_i nav_segment_start, nav_segment_end;
@@ -105,8 +107,11 @@ static inline void nav_set_altitude( void );
 #include "subsystems/datalink/telemetry.h"
 
 static void send_nav_status(void) {
+  float dist_home = sqrtf(dist2_to_home);
+  float dist_wp = sqrtf(dist2_to_wp);
   DOWNLINK_SEND_ROTORCRAFT_NAV_STATUS(DefaultChannel, DefaultDevice,
       &block_time, &stage_time,
+      &dist_home, &dist_wp,
       &nav_block, &nav_stage,
       &horizontal_mode);
   if (horizontal_mode == HORIZONTAL_MODE_ROUTE) {
@@ -137,21 +142,21 @@ static void send_wp_moved(void) {
 
 void nav_init(void) {
   // convert to
-  const struct EnuCoor_f wp_tmp_float[NB_WAYPOINT] = WAYPOINTS;
+  const struct EnuCoor_f wp_tmp_float[NB_WAYPOINT] = WAYPOINTS_ENU;
   // init int32 waypoints
   uint8_t i = 0;
   for (i = 0; i < nb_waypoint; i++) {
     waypoints[i].x = POS_BFP_OF_REAL(wp_tmp_float[i].x);
     waypoints[i].y = POS_BFP_OF_REAL(wp_tmp_float[i].y);
-    waypoints[i].z = POS_BFP_OF_REAL((wp_tmp_float[i].z - GROUND_ALT));
+    waypoints[i].z = POS_BFP_OF_REAL(wp_tmp_float[i].z);
   }
   nav_block = 0;
   nav_stage = 0;
   nav_altitude = POS_BFP_OF_REAL(SECURITY_HEIGHT);
   nav_flight_altitude = nav_altitude;
   flight_altitude = SECURITY_ALT;
-  INT32_VECT3_COPY(navigation_target, waypoints[WP_HOME]);
-  INT32_VECT3_COPY(navigation_carrot, waypoints[WP_HOME]);
+  VECT3_COPY(navigation_target, waypoints[WP_HOME]);
+  VECT3_COPY(navigation_carrot, waypoints[WP_HOME]);
 
   horizontal_mode = HORIZONTAL_MODE_WAYPOINT;
   vertical_mode = VERTICAL_MODE_ALT;
@@ -167,6 +172,7 @@ void nav_init(void) {
 
   too_far_from_home = FALSE;
   dist2_to_home = 0;
+  dist2_to_wp = 0;
 
 #if PERIODIC_TELEMETRY
   register_periodic_telemetry(DefaultPeriodic, "ROTORCRAFT_NAV_STATUS", send_nav_status);
@@ -174,7 +180,7 @@ void nav_init(void) {
 #endif
 }
 
-static inline void nav_advance_carrot(void) {
+static inline void UNUSED nav_advance_carrot(void) {
   struct EnuCoor_i *pos = stateGetPositionEnu_i();
   /* compute a vector to the waypoint */
   struct Int32Vect2 path_to_waypoint;
@@ -183,8 +189,7 @@ static inline void nav_advance_carrot(void) {
   /* saturate it */
   VECT2_STRIM(path_to_waypoint, -(1<<15), (1<<15));
 
-  int32_t dist_to_waypoint;
-  INT32_VECT2_NORM(dist_to_waypoint, path_to_waypoint);
+  int32_t dist_to_waypoint = int32_vect2_norm(&path_to_waypoint);
 
   if (dist_to_waypoint < CLOSE_TO_WAYPOINT) {
     VECT2_COPY(navigation_carrot, navigation_target);
@@ -212,6 +217,7 @@ void nav_run(void) {
 void nav_circle(struct EnuCoor_i * wp_center, int32_t radius) {
   if (radius == 0) {
     VECT2_COPY(navigation_target, *wp_center);
+    dist2_to_wp = get_dist2_to_point(wp_center);
   }
   else {
     struct Int32Vect2 pos_diff;
@@ -221,7 +227,7 @@ void nav_circle(struct EnuCoor_i * wp_center, int32_t radius) {
     // store last qdr
     int32_t last_qdr = nav_circle_qdr;
     // compute qdr
-    INT32_ATAN2(nav_circle_qdr, pos_diff.y, pos_diff.x);
+    nav_circle_qdr = int32_atan2(pos_diff.y, pos_diff.x);
     // increment circle radians
     if (nav_circle_radians != 0) {
       int32_t angle_diff = nav_circle_qdr - last_qdr;
@@ -256,10 +262,11 @@ void nav_circle(struct EnuCoor_i * wp_center, int32_t radius) {
 
 
 void nav_route(struct EnuCoor_i * wp_start, struct EnuCoor_i * wp_end) {
-  struct Int32Vect2 wp_diff,pos_diff;
+  struct Int32Vect2 wp_diff,pos_diff,wp_diff_prec;
   VECT2_DIFF(wp_diff, *wp_end, *wp_start);
   VECT2_DIFF(pos_diff, *stateGetPositionEnu_i(), *wp_start);
   // go back to metric precision or values are too large
+  VECT2_COPY(wp_diff_prec, wp_diff);
   INT32_VECT2_RSHIFT(wp_diff,wp_diff,INT32_POS_FRAC);
   INT32_VECT2_RSHIFT(pos_diff,pos_diff,INT32_POS_FRAC);
   int32_t leg_length2 = Max((wp_diff.x * wp_diff.x + wp_diff.y * wp_diff.y),1);
@@ -270,14 +277,14 @@ void nav_route(struct EnuCoor_i * wp_start, struct EnuCoor_i * wp_end) {
   int32_t prog_2 = nav_leg_length;
   Bound(nav_leg_progress, 0, prog_2);
   struct Int32Vect2 progress_pos;
-  VECT2_SMUL(progress_pos, wp_diff, nav_leg_progress);
-  VECT2_SDIV(progress_pos, progress_pos, nav_leg_length);
-  INT32_VECT2_LSHIFT(progress_pos, progress_pos, INT32_POS_FRAC);
+  VECT2_SMUL(progress_pos, wp_diff_prec, ((float)nav_leg_progress)/nav_leg_length);
   VECT2_SUM(navigation_target, *wp_start, progress_pos);
 
   nav_segment_start = *wp_start;
   nav_segment_end = *wp_end;
   horizontal_mode = HORIZONTAL_MODE_ROUTE;
+
+  dist2_to_wp = get_dist2_to_point(wp_end);
 }
 
 bool_t nav_approaching_from(struct EnuCoor_i * wp, struct EnuCoor_i * from, int16_t approaching_time) {
@@ -303,7 +310,7 @@ bool_t nav_approaching_from(struct EnuCoor_i * wp, struct EnuCoor_i * from, int1
    * distance with half metric precision (6.25 cm)
    */
   INT32_VECT2_RSHIFT(diff, diff, INT32_POS_FRAC/2);
-  INT32_VECT2_NORM(dist_to_point, diff);
+  dist_to_point = int32_vect2_norm(&diff);
 
   /* return TRUE if we have arrived */
   if (dist_to_point < BFP_OF_REAL(ARRIVED_AT_WAYPOINT, INT32_POS_FRAC/2))
@@ -323,7 +330,7 @@ bool_t nav_approaching_from(struct EnuCoor_i * wp, struct EnuCoor_i * from, int1
 
 bool_t nav_check_wp_time(struct EnuCoor_i * wp, uint16_t stay_time) {
   uint16_t time_at_wp;
-  int32_t dist_to_point;
+  uint32_t dist_to_point;
   static uint16_t wp_entry_time = 0;
   static bool_t wp_reached = FALSE;
   static struct EnuCoor_i wp_last = { 0, 0, 0 };
@@ -335,7 +342,7 @@ bool_t nav_check_wp_time(struct EnuCoor_i * wp, uint16_t stay_time) {
   }
   VECT2_DIFF(diff, *wp, *stateGetPositionEnu_i());
   INT32_VECT2_RSHIFT(diff, diff, INT32_POS_FRAC/2);
-  INT32_VECT2_NORM(dist_to_point, diff);
+  dist_to_point = int32_vect2_norm(&diff);
   if (dist_to_point < BFP_OF_REAL(ARRIVED_AT_WAYPOINT, INT32_POS_FRAC/2)){
     if (!wp_reached) {
       wp_reached = TRUE;
@@ -378,7 +385,7 @@ unit_t nav_reset_alt( void ) {
 }
 
 void nav_init_stage( void ) {
-  INT32_VECT3_COPY(nav_last_point, *stateGetPositionEnu_i());
+  VECT3_COPY(nav_last_point, *stateGetPositionEnu_i());
   stage_time = 0;
   nav_circle_radians = 0;
   horizontal_mode = HORIZONTAL_MODE_WAYPOINT;
@@ -387,6 +394,8 @@ void nav_init_stage( void ) {
 #include <stdio.h>
 void nav_periodic_task(void) {
   RunOnceEvery(16, { stage_time++;  block_time++; });
+
+  dist2_to_wp = 0;
 
   /* from flight_plan.h */
   auto_nav();
@@ -399,6 +408,7 @@ void nav_move_waypoint_lla(uint8_t wp_id, struct LlaCoor_i* new_lla_pos) {
   if (stateIsLocalCoordinateValid()) {
     struct EnuCoor_i enu;
     enu_of_lla_point_i(&enu, &state.ned_origin_i, new_lla_pos);
+    // convert ENU pos from cm to BFP with INT32_POS_FRAC
     enu.x = POS_BFP_OF_REAL(enu.x)/100;
     enu.y = POS_BFP_OF_REAL(enu.y)/100;
     enu.z = POS_BFP_OF_REAL(enu.z)/100;
@@ -408,7 +418,7 @@ void nav_move_waypoint_lla(uint8_t wp_id, struct LlaCoor_i* new_lla_pos) {
 
 void nav_move_waypoint(uint8_t wp_id, struct EnuCoor_i * new_pos) {
   if (wp_id < nb_waypoint) {
-    INT32_VECT3_COPY(waypoints[wp_id],(*new_pos));
+    VECT3_COPY(waypoints[wp_id],(*new_pos));
     DOWNLINK_SEND_WP_MOVED_ENU(DefaultChannel, DefaultDevice, &wp_id, &(new_pos->x),
                                &(new_pos->y), &(new_pos->z));
   }
@@ -447,25 +457,37 @@ bool_t nav_is_in_flight(void) {
 /** Home mode navigation */
 void nav_home(void) {
   horizontal_mode = HORIZONTAL_MODE_WAYPOINT;
-  INT32_VECT3_COPY(navigation_target, waypoints[WP_HOME]);
+  VECT3_COPY(navigation_target, waypoints[WP_HOME]);
 
   vertical_mode = VERTICAL_MODE_ALT;
   nav_altitude = waypoints[WP_HOME].z;
   nav_flight_altitude = nav_altitude;
 
+  dist2_to_wp = dist2_to_home;
+
   /* run carrot loop */
   nav_run();
+}
+
+/** Returns squared horizontal distance to given point */
+float get_dist2_to_point(struct EnuCoor_i *p) {
+  struct EnuCoor_f* pos = stateGetPositionEnu_f();
+  struct FloatVect2 pos_diff;
+  pos_diff.x = POS_FLOAT_OF_BFP(p->x) - pos->x;
+  pos_diff.y = POS_FLOAT_OF_BFP(p->y) - pos->y;
+  return pos_diff.x * pos_diff.x + pos_diff.y * pos_diff.y;
+}
+
+/** Returns squared horizontal distance to given waypoint */
+float get_dist2_to_waypoint(uint8_t wp_id) {
+  return get_dist2_to_point(&waypoints[wp_id]);
 }
 
 /** Computes squared distance to the HOME waypoint potentially sets
  * #too_far_from_home
  */
 void compute_dist2_to_home(void) {
-  struct EnuCoor_i* pos = stateGetPositionEnu_i();
-  struct Int32Vect2 home_d;
-  VECT2_DIFF(home_d, waypoints[WP_HOME], *pos);
-  INT32_VECT2_RSHIFT(home_d, home_d, INT32_POS_FRAC);
-  dist2_to_home = (float)(home_d.x * home_d.x + home_d.y * home_d.y);
+  dist2_to_home = get_dist2_to_waypoint(WP_HOME);
   too_far_from_home = dist2_to_home > max_dist2_from_home;
 }
 
@@ -487,7 +509,7 @@ bool_t nav_set_heading_towards(float x, float y) {
   struct FloatVect2 pos_diff;
   VECT2_DIFF(pos_diff, target, *stateGetPositionEnu_f());
   // don't change heading if closer than 0.5m to target
-  if (FLOAT_VECT2_NORM2(pos_diff) > 0.25) {
+  if (VECT2_NORM2(pos_diff) > 0.25) {
     float heading_f = atan2f(pos_diff.x, pos_diff.y);
     nav_heading = ANGLE_BFP_OF_REAL(heading_f);
   }

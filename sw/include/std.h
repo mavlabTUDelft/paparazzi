@@ -74,12 +74,6 @@ typedef uint8_t unit_t;
 #define M_PI_2 (M_PI/2)
 #endif
 
-#ifndef cbi
-#define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))
-#endif
-#ifndef sbi
-#define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
-#endif
 
 #ifndef bit_is_set
 #define bit_is_set(x, b) ((x >> b) & 0x1)
@@ -231,5 +225,11 @@ static inline bool_t str_equal(const char * a, const char * b) {
   }
   return TRUE;
 }
+
+#ifdef __GNUC__
+#  define UNUSED __attribute__((__unused__))
+#else
+#  define UNUSED
+#endif
 
 #endif /* STD_H */

@@ -107,12 +107,20 @@
       <call fun="nav_survey_poly_osam_setup(WP_S1, 5, 100, 45)"/>
       <call fun="nav_survey_poly_osam_run()"/>
     </block>
+    <block name="ZamboniSurvey">
+      <call fun="nav_survey_zamboni_setup(WP_1, WP_2, 200, 40, 7, 290)"/>
+      <call fun="nav_survey_zamboni_run()"/>
+    </block>
     <block name="Flight Line block">
       <call fun="nav_line_osam_block_run(WP_S1, WP_S5, nav_radius, 30, 10)"/>
     </block>
     <block name="Vertical Raster">
       <call fun="nav_vertical_raster_setup()"/>
       <call fun="nav_vertical_raster_run(WP_S1, WP_S2, nav_radius, 50)"/>
+    </block>
+    <block name="Spiral">
+      <call fun="nav_spiral_setup(WP_S1, WP_S2, 30, 10, 3)"/>
+      <call fun="nav_spiral_run()"/>
     </block>
     <!--====================================================================================-->
 

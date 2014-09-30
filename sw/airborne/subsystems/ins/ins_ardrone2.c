@@ -46,8 +46,8 @@ struct InsArdrone2 ins_impl;
 void ins_init() {
 #if USE_INS_NAV_INIT
   struct LlaCoor_i llh_nav0; /* Height above the ellipsoid */
-  llh_nav0.lat = INT32_RAD_OF_DEG(NAV_LAT0);
-  llh_nav0.lon = INT32_RAD_OF_DEG(NAV_LON0);
+  llh_nav0.lat = NAV_LAT0;
+  llh_nav0.lon = NAV_LON0;
   /* NAV_ALT0 = ground alt above msl, NAV_MSL0 = geoid-height (msl) over ellipsoid */
   llh_nav0.alt = NAV_ALT0 + NAV_MSL0;
 
@@ -90,10 +90,10 @@ void ins_reset_altitude_ref( void ) {
 #endif
 }
 
-void ins_propagate() {
+void ins_propagate(float __attribute__((unused)) dt) {
   /* untilt accels and speeds */
-  FLOAT_RMAT_VECT3_TRANSP_MUL(ins_impl.ltp_accel, (*stateGetNedToBodyRMat_f()), ahrs_impl.accel);
-  FLOAT_RMAT_VECT3_TRANSP_MUL(ins_impl.ltp_speed, (*stateGetNedToBodyRMat_f()), ahrs_impl.speed);
+  float_rmat_transp_vmult(&ins_impl.ltp_accel, stateGetNedToBodyRMat_f(), &ahrs_impl.accel);
+  float_rmat_transp_vmult(&ins_impl.ltp_speed, stateGetNedToBodyRMat_f(), &ahrs_impl.speed);
 
   //Add g to the accelerations
   ins_impl.ltp_accel.z += 9.81;

@@ -54,6 +54,13 @@
         <property name="color" value="white"/>
       </papget>
 
+      <papget type="message_field" display="text" x="600" y="422">
+        <property name="field" value="NAVIGATION.dist_home"/>
+        <property name="size" value="15."/>
+        <property name="format" value="HOME dist: %.1fm"/>
+        <property name="color" value="white"/>
+      </papget>
+
       <papget type="variable_setting" display="button" x="10" y="250">
         <property name="variable" value="launch"/>
         <property name="value" value="1."/>

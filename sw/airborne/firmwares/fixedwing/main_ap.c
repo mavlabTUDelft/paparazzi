@@ -121,21 +121,20 @@ PRINT_CONFIG_VAR(TELEMETRY_FREQUENCY)
  */
 PRINT_CONFIG_VAR(MODULES_FREQUENCY)
 
+#if USE_BARO_BOARD
+#ifndef BARO_PERIODIC_FREQUENCY
+#define BARO_PERIODIC_FREQUENCY 50
+#endif
+PRINT_CONFIG_VAR(BARO_PERIODIC_FREQUENCY)
+#endif
 
 #if USE_AHRS && USE_IMU
 
-#ifndef AHRS_PROPAGATE_FREQUENCY
-#define AHRS_PROPAGATE_FREQUENCY PERIODIC_FREQUENCY
-#endif
-PRINT_CONFIG_VAR(AHRS_PROPAGATE_FREQUENCY)
-#ifndef AHRS_CORRECT_FREQUENCY
-#define AHRS_CORRECT_FREQUENCY PERIODIC_FREQUENCY
-#endif
-PRINT_CONFIG_VAR(AHRS_CORRECT_FREQUENCY)
-
+#ifdef AHRS_PROPAGATE_FREQUENCY
 #if (AHRS_PROPAGATE_FREQUENCY > PERIODIC_FREQUENCY)
 #warning "PERIODIC_FREQUENCY should be least equal or greater than AHRS_PROPAGATE_FREQUENCY"
 INFO_VALUE("it is recommended to configure in your airframe PERIODIC_FREQUENCY to at least ",AHRS_PROPAGATE_FREQUENCY)
+#endif
 #endif
 
 static inline void on_gyro_event( void );
@@ -144,7 +143,7 @@ static inline void on_mag_event( void );
 volatile uint8_t ahrs_timeout_counter = 0;
 
 //FIXME not the correct place
-static void send_fliter_status(void) {
+static void send_filter_status(void) {
   uint8_t mde = 3;
   if (ahrs.status == AHRS_UNINIT) mde = 2;
   if (ahrs_timeout_counter > 10) mde = 5;
@@ -172,7 +171,9 @@ tid_t sensors_tid;     ///< id for sensors_task() timer
 tid_t attitude_tid;    ///< id for attitude_loop() timer
 tid_t navigation_tid;  ///< id for navigation_task() timer
 tid_t monitor_tid;     ///< id for monitor_task() timer
-
+#if USE_BARO_BOARD
+tid_t baro_tid;          ///< id for baro_periodic() timer
+#endif
 
 void init_ap( void ) {
 #ifndef SINGLE_MCU /** init done in main_fbw in single MCU */
@@ -190,9 +191,6 @@ void init_ap( void ) {
 
 #if USE_IMU
   imu_init();
-#if USE_IMU_FLOAT
-  imu_float_init();
-#endif
 #endif
 
 #if USE_AHRS_ALIGNER
@@ -204,7 +202,7 @@ void init_ap( void ) {
 #endif
 
 #if USE_AHRS && USE_IMU
-  register_periodic_telemetry(DefaultPeriodic, "STATE_FILTER_STATUS", send_fliter_status);
+  register_periodic_telemetry(DefaultPeriodic, "STATE_FILTER_STATUS", send_filter_status);
 #endif
 
   air_data_init();
@@ -239,6 +237,9 @@ void init_ap( void ) {
   modules_tid = sys_time_register_timer(1./MODULES_FREQUENCY, NULL);
   telemetry_tid = sys_time_register_timer(1./TELEMETRY_FREQUENCY, NULL);
   monitor_tid = sys_time_register_timer(1.0, NULL);
+#if USE_BARO_BOARD
+  baro_tid = sys_time_register_timer(1./BARO_PERIODIC_FREQUENCY, NULL);
+#endif
 
   /** - start interrupt task */
   mcu_int_enable();
@@ -276,6 +277,11 @@ void handle_periodic_tasks_ap(void) {
 
   if (sys_time_check_and_ack_timer(sensors_tid))
     sensors_task();
+
+#if USE_BARO_BOARD
+  if (sys_time_check_and_ack_timer(baro_tid))
+    baro_periodic();
+#endif
 
   if (sys_time_check_and_ack_timer(navigation_tid))
     navigation_task();
@@ -592,11 +598,8 @@ void sensors_task( void ) {
 
   //FIXME: this is just a kludge
 #if USE_AHRS && defined SITL && !USE_NPS
-  ahrs_propagate();
-#endif
-
-#if USE_BARO_BOARD
-  baro_periodic();
+  // dt is not really used in ahrs_sim
+  ahrs_propagate(1./PERIODIC_FREQUENCY);
 #endif
 
 #if USE_GPS
@@ -719,17 +722,50 @@ static inline void on_gps_solution( void ) {
 #if USE_AHRS
 #if USE_IMU
 static inline void on_accel_event( void ) {
+#if USE_AUTO_AHRS_FREQ || !defined(AHRS_CORRECT_FREQUENCY)
+PRINT_CONFIG_MSG("Calculating dt for AHRS accel update.")
+  // timestamp in usec when last callback was received
+  static uint32_t last_ts = 0;
+  // current timestamp
+  uint32_t now_ts = get_sys_time_usec();
+  // dt between this and last callback in seconds
+  float dt = (float)(now_ts - last_ts) / 1e6;
+  last_ts = now_ts;
+#else
+PRINT_CONFIG_MSG("Using fixed AHRS_CORRECT_FREQUENCY for AHRS accel update.")
+PRINT_CONFIG_VAR(AHRS_CORRECT_FREQUENCY)
+  const float dt = 1./AHRS_CORRECT_FREQUENCY;
+#endif
+
+  ImuScaleAccel(imu);
+  if (ahrs.status != AHRS_UNINIT) {
+    ahrs_update_accel(dt);
+  }
 }
 
 static inline void on_gyro_event( void ) {
+#if USE_AUTO_AHRS_FREQ || !defined(AHRS_PROPAGATE_FREQUENCY)
+PRINT_CONFIG_MSG("Calculating dt for AHRS/INS propagation.")
+  // timestamp in usec when last callback was received
+  static uint32_t last_ts = 0;
+  // current timestamp
+  uint32_t now_ts = get_sys_time_usec();
+  // dt between this and last callback in seconds
+  float dt = (float)(now_ts - last_ts) / 1e6;
+  last_ts = now_ts;
+#else
+PRINT_CONFIG_MSG("Using fixed AHRS_PROPAGATE_FREQUENCY for AHRS/INS propagation.")
+PRINT_CONFIG_VAR(AHRS_PROPAGATE_FREQUENCY)
+  const float dt = 1. / (AHRS_PROPAGATE_FREQUENCY);
+#endif
 
   ahrs_timeout_counter = 0;
+
+  ImuScaleGyro(imu);
 
 #if USE_AHRS_ALIGNER
   // Run aligner on raw data as it also makes averages.
   if (ahrs.status == AHRS_UNINIT) {
-    ImuScaleGyro(imu);
-    ImuScaleAccel(imu);
     ahrs_aligner_run();
     if (ahrs_aligner.status == AHRS_ALIGNER_LOCKED)
       ahrs_align();
@@ -737,49 +773,7 @@ static inline void on_gyro_event( void ) {
   }
 #endif
 
-#if PERIODIC_FREQUENCY == 60
-  ImuScaleGyro(imu);
-  ImuScaleAccel(imu);
-
-  ahrs_propagate();
-  ahrs_update_accel();
-
-#else //PERIODIC_FREQUENCY
-  static uint8_t _reduced_propagation_rate = 0;
-  static uint8_t _reduced_correction_rate = 0;
-  static struct Int32Vect3 acc_avg;
-  static struct Int32Rates gyr_avg;
-
-  RATES_ADD(gyr_avg, imu.gyro_unscaled);
-  VECT3_ADD(acc_avg, imu.accel_unscaled);
-
-  _reduced_propagation_rate++;
-  if (_reduced_propagation_rate < (PERIODIC_FREQUENCY / AHRS_PROPAGATE_FREQUENCY))
-  {
-    return;
-  }
-  else
-  {
-    _reduced_propagation_rate = 0;
-
-    RATES_SDIV(imu.gyro_unscaled, gyr_avg, (PERIODIC_FREQUENCY / AHRS_PROPAGATE_FREQUENCY) );
-    INT_RATES_ZERO(gyr_avg);
-
-    ImuScaleGyro(imu);
-
-    ahrs_propagate();
-
-    _reduced_correction_rate++;
-    if (_reduced_correction_rate >= (AHRS_PROPAGATE_FREQUENCY / AHRS_CORRECT_FREQUENCY))
-    {
-      _reduced_correction_rate = 0;
-      VECT3_SDIV(imu.accel_unscaled, acc_avg, (PERIODIC_FREQUENCY / AHRS_CORRECT_FREQUENCY) );
-      INT_VECT3_ZERO(acc_avg);
-      ImuScaleAccel(imu);
-      ahrs_update_accel();
-    }
-  }
-#endif //PERIODIC_FREQUENCY
+  ahrs_propagate(dt);
 
 #if defined SITL && USE_NPS
   if (nps_bypass_ahrs) sim_overwrite_ahrs();
@@ -794,9 +788,24 @@ static inline void on_gyro_event( void ) {
 static inline void on_mag_event(void)
 {
 #if USE_MAGNETOMETER
+#if USE_AUTO_AHRS_FREQ || !defined(AHRS_MAG_CORRECT_FREQUENCY)
+PRINT_CONFIG_MSG("Calculating dt for AHRS mag update.")
+  // timestamp in usec when last callback was received
+  static uint32_t last_ts = 0;
+  // current timestamp
+  uint32_t now_ts = get_sys_time_usec();
+  // dt between this and last callback in seconds
+  float dt = (float)(now_ts - last_ts) / 1e6;
+  last_ts = now_ts;
+#else
+PRINT_CONFIG_MSG("Using fixed AHRS_MAG_CORRECT_FREQUENCY for AHRS mag update.")
+PRINT_CONFIG_VAR(AHRS_MAG_CORRECT_FREQUENCY)
+  const float dt = 1. / (AHRS_MAG_CORRECT_FREQUENCY);
+#endif
+
   ImuScaleMag(imu);
   if (ahrs.status == AHRS_RUNNING) {
-    ahrs_update_mag();
+    ahrs_update_mag(dt);
   }
 #endif
 }
@@ -804,4 +813,3 @@ static inline void on_mag_event(void)
 #endif // USE_IMU
 
 #endif // USE_AHRS
-

@@ -61,7 +61,7 @@ bool_t nav_spiral_setup(uint8_t center_wp, uint8_t edge_wp, float radius_start, 
   struct FloatVect2 edge;
   VECT2_DIFF(edge, waypoints[edge_wp], nav_spiral.center);
 
-  FLOAT_VECT2_NORM(nav_spiral.radius, edge);
+  nav_spiral.radius = float_vect2_norm(&edge);
 
   // get a copy of the current position
   struct EnuCoor_f pos_enu;
@@ -79,7 +79,7 @@ bool_t nav_spiral_setup(uint8_t center_wp, uint8_t edge_wp, float radius_start, 
   nav_spiral.fly_from.y = stateGetPositionEnu_f()->y;
 
   if(nav_spiral.dist_from_center > nav_spiral.radius)
-    nav_spiral.status = Outside;
+    nav_spiral.status = SpiralOutside;
   return FALSE;
 }
 
@@ -96,7 +96,7 @@ bool_t nav_spiral_run(void)
 
   switch(nav_spiral.status)
   {
-    case Outside:
+    case SpiralOutside:
       //flys until center of the helix is reached an start helix
       nav_route_xy(nav_spiral.fly_from.x, nav_spiral.fly_from.y, nav_spiral.center.x, nav_spiral.center.y);
       // center reached?
@@ -105,24 +105,24 @@ bool_t nav_spiral_run(void)
 #ifdef DIGITAL_CAM
         dc_send_command(DC_SHOOT);
 #endif
-        nav_spiral.status = StartCircle;
+        nav_spiral.status = SpiralStartCircle;
       }
       break;
-    case StartCircle:
+    case SpiralStartCircle:
       // Starts helix
       // storage of current coordinates
-      // calculation needed, State switch to Circle
+      // calculation needed, State switch to SpiralCircle
       nav_circle_XY(nav_spiral.center.y, nav_spiral.center.y, nav_spiral.radius_start);
       if(nav_spiral.dist_from_center >= nav_spiral.radius_start){
         VECT2_COPY(nav_spiral.last_circle, pos_enu);
-        nav_spiral.status = Circle;
+        nav_spiral.status = SpiralCircle;
         // Start helix
 #ifdef DIGITAL_CAM
         dc_Circle(360/nav_spiral.segments);
 #endif
       }
       break;
-    case Circle: {
+    case SpiralCircle: {
       nav_circle_XY(nav_spiral.center.x, nav_spiral.center.y, nav_spiral.radius_start);
       // Trigonometrische Berechnung des bereits geflogenen Winkels alpha
       // equation:
@@ -132,15 +132,15 @@ bool_t nav_spiral_run(void)
       //DistanceStartEstim = |Starting position angular - current positon|
       struct FloatVect2 pos_diff;
       VECT2_DIFF(pos_diff, nav_spiral.last_circle, pos_enu);
-      FLOAT_VECT2_NORM(DistanceStartEstim, pos_diff);
+      DistanceStartEstim = float_vect2_norm(&pos_diff);
       CircleAlpha = (2.0 * asin (DistanceStartEstim / (2 * nav_spiral.radius_start)));
       if (CircleAlpha >= nav_spiral.alpha_limit) {
         VECT2_COPY(nav_spiral.last_circle, pos_enu);
-        nav_spiral.status = IncSpiral;
+        nav_spiral.status = SpiralInc;
       }
       break;
     }
-    case IncSpiral:
+    case SpiralInc:
       // increasing circle radius as long as it is smaller than max helix radius
       if(nav_spiral.radius_start + nav_spiral.radius_increment < nav_spiral.radius)
       {
@@ -160,7 +160,7 @@ bool_t nav_spiral_run(void)
         dc_stop();
 #endif
       }
-      nav_spiral.status = Circle;
+      nav_spiral.status = SpiralCircle;
       break;
     default:
       break;

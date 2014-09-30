@@ -25,7 +25,7 @@
  */
 
 #include "subsystems/imu.h"
-
+#include "mcu_periph/sys_time.h"
 #include "mcu_periph/spi.h"
 #include "peripherals/hmc58xx_regs.h"
 
@@ -91,6 +91,10 @@ PRINT_CONFIG_VAR(ASPIRIN_2_ACCEL_RANGE)
 #define HMC58XX_CRA ((HMC58XX_DO<<2)|(HMC58XX_MS))
 #define HMC58XX_CRB (HMC58XX_GN<<5)
 
+/** delay in seconds before starting to configure HMC58xx mag slave */
+#ifndef ASPIRIN_2_MAG_STARTUP_DELAY
+#define ASPIRIN_2_MAG_STARTUP_DELAY 1.5
+#endif
 
 struct ImuAspirin2Spi imu_aspirin2;
 
@@ -164,17 +168,8 @@ void imu_aspirin2_event(void)
     mag.x = Int16FromBuf(imu_aspirin2.mpu.data_ext, 0);
     mag.z = Int16FromBuf(imu_aspirin2.mpu.data_ext, 2);
     mag.y = Int16FromBuf(imu_aspirin2.mpu.data_ext, 4);
-#ifdef LISA_M_LONGITUDINAL_X
-    RATES_ASSIGN(imu.gyro_unscaled,
-                 imu_aspirin2.mpu.data_rates.rates.q,
-                 -imu_aspirin2.mpu.data_rates.rates.p,
-                 imu_aspirin2.mpu.data_rates.rates.r);
-    VECT3_ASSIGN(imu.accel_unscaled,
-                 imu_aspirin2.mpu.data_accel.vect.y,
-                 -imu_aspirin2.mpu.data_accel.vect.x,
-                 imu_aspirin2.mpu.data_accel.vect.z);
-    VECT3_ASSIGN(imu.mag_unscaled, -mag.x, -mag.y, mag.z);
-#else
+
+/* Handle axis assignement for Lisa/S integrated Aspirin like IMU. */
 #ifdef LISA_S
 #ifdef LISA_S_UPSIDE_DOWN
     RATES_ASSIGN(imu.gyro_unscaled,
@@ -192,11 +187,41 @@ void imu_aspirin2_event(void)
     VECT3_COPY(imu.mag_unscaled, mag);
 #endif
 #else
+
+/* Handle axis assignement for Lisa/M or Lisa/MX V2.1 integrated Aspirin like
+ * IMU.
+ */
+#ifdef LISA_M_OR_MX_21
+    RATES_ASSIGN(imu.gyro_unscaled,
+                 -imu_aspirin2.mpu.data_rates.rates.q,
+                 imu_aspirin2.mpu.data_rates.rates.p,
+                 imu_aspirin2.mpu.data_rates.rates.r);
+    VECT3_ASSIGN(imu.accel_unscaled,
+                 -imu_aspirin2.mpu.data_accel.vect.y,
+                 imu_aspirin2.mpu.data_accel.vect.x,
+                 imu_aspirin2.mpu.data_accel.vect.z);
+    VECT3_ASSIGN(imu.mag_unscaled, -mag.y, mag.x, mag.z);
+#else
+
+/* Handle real Aspirin IMU axis assignement. */
+#ifdef LISA_M_LONGITUDINAL_X
+    RATES_ASSIGN(imu.gyro_unscaled,
+                 imu_aspirin2.mpu.data_rates.rates.q,
+                 -imu_aspirin2.mpu.data_rates.rates.p,
+                 imu_aspirin2.mpu.data_rates.rates.r);
+    VECT3_ASSIGN(imu.accel_unscaled,
+                 imu_aspirin2.mpu.data_accel.vect.y,
+                 -imu_aspirin2.mpu.data_accel.vect.x,
+                 imu_aspirin2.mpu.data_accel.vect.z);
+    VECT3_ASSIGN(imu.mag_unscaled, -mag.x, -mag.y, mag.z);
+#else
     RATES_COPY(imu.gyro_unscaled, imu_aspirin2.mpu.data_rates.rates);
     VECT3_COPY(imu.accel_unscaled, imu_aspirin2.mpu.data_accel.vect);
     VECT3_ASSIGN(imu.mag_unscaled, mag.y, -mag.x, mag.z)
 #endif
 #endif
+#endif
+
     imu_aspirin2.mpu.data_available = FALSE;
     imu_aspirin2.gyro_valid = TRUE;
     imu_aspirin2.accel_valid = TRUE;
@@ -216,6 +241,11 @@ static inline void mpu_set_and_wait(Mpu60x0ConfigSet mpu_set, void* mpu, uint8_t
  */
 bool_t imu_aspirin2_configure_mag_slave(Mpu60x0ConfigSet mpu_set, void* mpu)
 {
+  // wait before starting the configuration of the HMC58xx mag
+  // doing to early may void the mode configuration
+  if (get_sys_time_float() < ASPIRIN_2_MAG_STARTUP_DELAY)
+    return FALSE;
+
   mpu_set_and_wait(mpu_set, mpu, MPU60X0_REG_I2C_SLV4_ADDR, (HMC58XX_ADDR >> 1));
   mpu_set_and_wait(mpu_set, mpu, MPU60X0_REG_I2C_SLV4_REG, HMC58XX_REG_CFGA);
   mpu_set_and_wait(mpu_set, mpu, MPU60X0_REG_I2C_SLV4_DO, HMC58XX_CRA);

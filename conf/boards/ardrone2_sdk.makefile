@@ -2,7 +2,7 @@
 #
 # ardrone2_sdk.makefile
 #
-# http://paparazzi.enac.fr/wiki/AR.Drone_2_-_Specifications
+# http://wiki.paparazziuav.org/wiki/AR.Drone_2_-_Specifications
 #
 
 BOARD=ardrone
@@ -32,6 +32,9 @@ ARDRONE2_IP_ADDRESS_PROBE ?= 1
 # The GPS sensor is connected trough USB so we have to define the device
 GPS_PORT         ?= UART1
 GPS_BAUD         ?= B57600
+
+# The datalink default uses UDP
+MODEM_HOST       ?= \"192.168.1.255\"
 
 # Here we define what the UART1_DEV device mapping
 $(TARGET).CFLAGS += -DUART1_DEV=\"/dev/ttyUSB0\"

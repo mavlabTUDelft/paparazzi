@@ -45,6 +45,7 @@
   <modules>
     <load name="gps_ubx_ucenter.xml"/>
     <!-- load name="airspeed_ms45xx.xml"/ -->
+    <load name="direct_memory_logger.xml"/>
   </modules>
 
   <servos driver="Asctec_v2">
@@ -185,7 +186,7 @@
     <define name="USE_SPEED_REF" value="TRUE"/>
     <define name="PGAIN" value="50"/>
     <define name="DGAIN" value="100"/>
-    <define name="AGAIN" value="100"/>
+    <define name="AGAIN" value="70"/>
     <define name="IGAIN" value="20"/>
   </section>
 

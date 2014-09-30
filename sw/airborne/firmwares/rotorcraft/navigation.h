@@ -74,6 +74,10 @@ extern float dist2_to_home;      ///< squared distance to home waypoint
 extern bool_t too_far_from_home;
 extern float failsafe_mode_dist2; ///< maximum squared distance to home wp before going to failsafe mode
 
+extern float dist2_to_wp;       ///< squared distance to next waypoint
+
+extern float get_dist2_to_waypoint(uint8_t wp_id);
+extern float get_dist2_to_point(struct EnuCoor_i *p);
 extern void compute_dist2_to_home(void);
 extern void nav_home(void);
 
@@ -120,7 +124,8 @@ extern bool_t nav_set_heading_current(void);
 /*********** Navigation to  waypoint *************************************/
 #define NavGotoWaypoint(_wp) { \
   horizontal_mode = HORIZONTAL_MODE_WAYPOINT; \
-  INT32_VECT3_COPY( navigation_target, waypoints[_wp]); \
+  VECT3_COPY(navigation_target, waypoints[_wp]); \
+  dist2_to_wp = get_dist2_to_waypoint(_wp); \
 }
 
 /*********** Navigation on a circle **************************************/
@@ -131,7 +136,7 @@ extern void nav_circle(struct EnuCoor_i * wp_center, int32_t radius);
 }
 
 #define NavCircleCount() (abs(nav_circle_radians) / INT32_ANGLE_2_PI)
-#define NavCircleQdr() ({ int32_t qdr = INT32_DEG_OF_RAD(INT32_ANGLE_2_PI_2 - nav_circle_qdr) >> INT32_ANGLE_FRAC; NormCourse(qdr); qdr; })
+#define NavCircleQdr() ({ int32_t qdr = INT32_DEG_OF_RAD(INT32_ANGLE_2_PI_2 - nav_circle_qdr) >> INT32_ANGLE_FRAC; NormCourse(qdr); qdr; })
 
 /** True if x (in degrees) is close to the current QDR (less than 10 degrees)*/
 #define NavQdrCloseTo(x) {}

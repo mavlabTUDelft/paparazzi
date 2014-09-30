@@ -390,9 +390,8 @@ let get_icon_and_track_size = fun af_xml ->
   try
     (* search AC_ICON in GCS section *)
     let gcs_section = ExtXml.child af_xml ~select:(fun x -> Xml.attrib x "name" = "GCS") "section" in
-    let fvalue = fun name default ->
-      try ExtXml.attrib (ExtXml.child gcs_section ~select:(fun x -> ExtXml.attrib x "name" = name) "define") "value" with _ -> default in
-    match fvalue "AC_ICON" "fixedwing" with
+    let ac_icon = ExtXml.child gcs_section ~select:(fun x -> ExtXml.attrib x "name" = "AC_ICON") "define" in
+    match ExtXml.attrib ac_icon "value" with
     | "home" -> ("home", 1) (* no track for home icon *)
     | x -> (x, !track_size)
   with _ -> (firmware_name, !track_size)
@@ -1157,8 +1156,8 @@ let listen_flight_params = fun geomap auto_center_new_ac alert alt_graph ->
       ac.last_block_name <- b;
       ac.strip#set_label "block_name" b
     end;
-    let block_time = Int32.to_int (Pprz.int32_assoc "block_time" vs)
-    and stage_time = Int32.to_int (Pprz.int32_assoc "stage_time" vs) in
+    let block_time = Int64.to_int (Pprz.uint32_assoc "block_time" vs)
+    and stage_time = Int64.to_int (Pprz.uint32_assoc "stage_time" vs) in
     let bt = sprintf "%02d:%02d" (block_time / 60) (block_time mod 60) in
     ac.strip#set_label "block_time" bt;
     let st = sprintf "%02d:%02d" (stage_time / 60) (stage_time mod 60) in
@@ -1167,7 +1166,7 @@ let listen_flight_params = fun geomap auto_center_new_ac alert alt_graph ->
     (* Estimated Time Arrival to next waypoint *)
     let d = Pprz.float_assoc "dist_to_wp" vs in
     let label =
-      if d = 0. || ac.speed = 0. then
+      if d < 0.5 || ac.speed < 0.5 then
         "N/A"
       else
         sprintf "%.0fs" (d /. ac.speed) in
@@ -1239,7 +1238,7 @@ let listen_flight_params = fun geomap auto_center_new_ac alert alt_graph ->
 
   let get_ap_status = fun _sender vs ->
     let ac = get_ac vs in
-    let flight_time = Int32.to_int (Pprz.int32_assoc "flight_time" vs) in
+    let flight_time = Int64.to_int (Pprz.uint32_assoc "flight_time" vs) in
     ac.track#update_ap_status (float_of_int flight_time);
     ac.flight_time <- flight_time;
     let ap_mode = Pprz.string_assoc "ap_mode" vs in
@@ -1439,6 +1438,6 @@ let listen_acs_and_msgs = fun geomap ac_notebook my_alert auto_center_new_ac alt
       center geomap ac.track () in
   let key_press = fun ev ->
     match GdkEvent.Key.keyval ev with
-      | k when k = GdkKeysyms._c -> center_active () ; true
+      | k when (k = GdkKeysyms._c) || (k = GdkKeysyms._C) -> center_active () ; true
       | _ -> false in
   ignore (geomap#canvas#event#connect#after#key_press key_press)

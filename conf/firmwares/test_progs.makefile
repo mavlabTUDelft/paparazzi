@@ -213,6 +213,9 @@ test_actuators_pwm.CFLAGS += $(COMMON_TELEMETRY_CFLAGS)
 test_actuators_pwm.srcs   += $(COMMON_TELEMETRY_SRCS)
 test_actuators_pwm.srcs   += test/test_actuators_pwm.c
 test_actuators_pwm.srcs   += $(SRC_ARCH)/subsystems/actuators/actuators_pwm_arch.c $(SRC_ARCH)/subsystems/actuators/actuators_shared_arch.c
+# only add this so it doesn't fail to build if you also have setup_actuators.xml settings file loaded
+# remove me again when we have auto loading of settings according to subsystem/module/target...
+test_actuators_pwm.srcs   += subsystems/actuators.c
 
 
 #
@@ -286,7 +289,6 @@ test_baro_board.CFLAGS += $(COMMON_TEST_CFLAGS)
 test_baro_board.srcs   += $(COMMON_TEST_SRCS)
 test_baro_board.CFLAGS += $(COMMON_TELEMETRY_CFLAGS)
 test_baro_board.srcs   += $(COMMON_TELEMETRY_SRCS)
-test_baro_board.srcs += subsystems/air_data.c
 test_baro_board.srcs += test/test_baro_board.c
 test_baro_board.srcs += mcu_periph/i2c.c $(SRC_ARCH)/mcu_periph/i2c_arch.c
 ifeq ($(TARGET),test_baro_board)
@@ -344,3 +346,21 @@ test_radio_control.srcs   += $(COMMON_TEST_SRCS)
 test_radio_control.CFLAGS += $(COMMON_TELEMETRY_CFLAGS)
 test_radio_control.srcs   += $(COMMON_TELEMETRY_SRCS)
 test_radio_control.srcs   += test/subsystems/test_radio_control.c
+
+
+#
+# test_settings :
+#
+# configuration
+#   MODEM_PORT :
+#   MODEM_BAUD :
+#
+test_settings.ARCHDIR = $(ARCH)
+test_settings.CFLAGS += $(COMMON_TEST_CFLAGS)
+test_settings.srcs   += $(COMMON_TEST_SRCS)
+test_settings.CFLAGS += $(COMMON_TELEMETRY_CFLAGS)
+test_settings.srcs   += $(COMMON_TELEMETRY_SRCS)
+test_settings.srcs   += subsystems/settings.c
+test_settings.srcs   += $(SRC_ARCH)/subsystems/settings_arch.c
+test_settings.srcs   += test/subsystems/test_settings.c
+test_settings.CFLAGS += -DUSE_PERSISTENT_SETTINGS

@@ -44,6 +44,7 @@ let fvalue = fun x ->
   match x with
       Pprz.Float x -> x
     | Pprz.Int32 x -> Int32.to_float x
+    | Pprz.Int64 x -> Int64.to_float x
     | Pprz.Int x -> float_of_int x
     | _ -> failwith (sprintf "Receive.log_and_parse: float expected, got '%s'" (Pprz.string_of_value x))
 
@@ -52,6 +53,7 @@ let ivalue = fun x ->
   match x with
       Pprz.Int x -> x
     | Pprz.Int32 x -> Int32.to_int x
+    | Pprz.Int64 x -> Int64.to_int x
     | _ -> failwith "Receive.log_and_parse: int expected"
 
 let format_string_field = fun s ->
@@ -120,7 +122,7 @@ let log_and_parse = fun ac_name (a:Aircraft.aircraft) msg values ->
     | "GPS_LLA" ->
       let lat = ivalue "lat"
       and lon = ivalue "lon" in
-      let geo = make_geo (float lat /. 1e7) (float lon /. 1e7) in
+      let geo = make_geo_deg (float lat /. 1e7) (float lon /. 1e7) in
       a.pos <- geo;
       a.unix_time <- LL.unix_time_of_tow (truncate (fvalue "itow" /. 1000.));
       a.itow <- Int32.of_float (fvalue "itow");
@@ -165,7 +167,7 @@ let log_and_parse = fun ac_name (a:Aircraft.aircraft) msg values ->
     | "NAVIGATION_REF_LLA" ->
       let lat = ivalue "lat"
       and lon = ivalue "lon" in
-      let geo = make_geo (float lat /. 1e7) (float lon /. 1e7) in
+      let geo = make_geo_deg (float lat /. 1e7) (float lon /. 1e7) in
       a.nav_ref <- Some (Geo geo);
       a.ground_alt <- fvalue "ground_alt";
       if a.gps_mode = _3D then
@@ -187,7 +189,7 @@ let log_and_parse = fun ac_name (a:Aircraft.aircraft) msg values ->
     | "NAVIGATION" ->
       a.cur_block <- ivalue "cur_block";
       a.cur_stage <- ivalue "cur_stage";
-      a.dist_to_wp <- sqrt (fvalue "dist2_wp")
+      a.dist_to_wp <- (try sqrt (fvalue "dist2_wp") with _ -> fvalue "dist_wp");
     | "BAT" ->
       a.throttle <- fvalue "throttle" /. 9600. *. 100.;
       a.kill_mode <- ivalue "kill_auto_throttle" <> 0;
@@ -315,7 +317,7 @@ let log_and_parse = fun ac_name (a:Aircraft.aircraft) msg values ->
       let lat = ivalue "lat"
       and lon = ivalue "lon"
       and alt = ivalue "alt" in
-      let geo = make_geo (float lat /. 1e7) (float lon /. 1e7) in
+      let geo = make_geo_deg (float lat /. 1e7) (float lon /. 1e7) in
       update_waypoint a (ivalue "wp_id") geo (float alt /. 100.)
     | "GENERIC_COM" ->
       let flight_time = ivalue "flight_time" in
@@ -323,7 +325,7 @@ let log_and_parse = fun ac_name (a:Aircraft.aircraft) msg values ->
         a.flight_time <- flight_time;
         let lat = fvalue "lat"
         and lon = fvalue "lon" in
-        let geo = make_geo (lat /. 1e7) (lon /. 1e7) in
+        let geo = make_geo_deg (lat /. 1e7) (lon /. 1e7) in
         a.pos <- geo;
         a.alt <- fvalue "alt";
         a.gspeed  <- fvalue "gspeed" /. 100.;

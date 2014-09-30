@@ -32,7 +32,6 @@ struct AhrsFloatDCM {
   struct FloatRates rate_correction;
 
   struct FloatEulers ltp_to_imu_euler;
-  struct FloatRMat body_to_imu_rmat;
   struct FloatRates imu_rate;
 
   float gps_speed;
@@ -42,11 +41,6 @@ struct AhrsFloatDCM {
   uint8_t gps_age;
 };
 extern struct AhrsFloatDCM ahrs_impl;
-
-
-// FIXME neutrals should be a feature of state interface ?
-extern float ins_roll_neutral;
-extern float ins_pitch_neutral;
 
 
 // DCM Parameters

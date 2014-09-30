@@ -41,12 +41,12 @@ SERVERCMO = server_globals.cmo aircraft.cmo wind.cmo airprox.cmo kml.cmo fw_serv
 SERVERCMX = $(SERVERCMO:.cmo=.cmx)
 
 
-all: link server messages settings dia diadec ivy_tcp_aircraft ivy_tcp_controller broadcaster ivy2udp ivy_serial_bridge app_server video_synchronizer
+all: link server messages settings dia diadec ivy_tcp_aircraft ivy_tcp_controller broadcaster ivy2udp ivy_serial_bridge app_server ivy2nmea
 
 opt: server.opt
 
 clean:
-	$(Q)rm -f link server messages settings dia diadec *.bak *~ core *.o .depend *.opt *.out *.cm* ivy_tcp_aircraft ivy_tcp_controller broadcaster ivy2udp ivy_serial_bridge app_server gpsd2ivy c_ivy_client_example_1 c_ivy_client_example_2 c_ivy_client_example_3 video_synchronizer
+	$(Q)rm -f link server messages settings dia diadec *.bak *~ core *.o .depend *.opt *.out *.cm* ivy_tcp_aircraft ivy_tcp_controller broadcaster ivy2udp ivy_serial_bridge app_server gpsd2ivy c_ivy_client_example_1 c_ivy_client_example_2 c_ivy_client_example_3
 
 messages : messages.cmo $(LIBPPRZCMA)
 	@echo OL $@
@@ -139,6 +139,10 @@ app_server: app_server.c
 gpsd2ivy: gpsd2ivy.c
 	$(CC) $(GLIB_CFLAGS) $(C_LIBRARYS) $(C_INCLUDES) -o $@ $< $(GLIB_LDFLAGS) -lgps
 
+ivy2nmea: ivy2nmea.c
+	@echo OL $@
+	$(Q)$(CC) $(GLIB_CFLAGS) $(C_LIBRARYS) $(C_INCLUDES) -o $@ $< $(GLIB_LDFLAGS) -lgps
+
 c_ivy_client_example_1: c_ivy_client_example_1.c
 	$(CC) $(GLIB_CFLAGS) $(C_LIBRARYS) $(C_INCLUDES) -o $@ $< $(GLIB_LDFLAGS)
 
@@ -146,9 +150,6 @@ c_ivy_client_example_2: c_ivy_client_example_2.c
 	$(CC) $(GLIB_CFLAGS) $(C_LIBRARYS) $(C_INCLUDES) -o $@ $< $(GLIB_LDFLAGS)
 
 c_ivy_client_example_3: c_ivy_client_example_3.c
-	$(CC) $(GTK_CFLAGS) $(C_LIBRARYS) $(C_INCLUDES) -o $@ $< $(GTK_LDFLAGS)
-
-video_synchronizer: video_synchronizer.c
 	$(CC) $(GTK_CFLAGS) $(C_LIBRARYS) $(C_INCLUDES) -o $@ $< $(GTK_LDFLAGS)
 
 ivy_serial_bridge: ivy_serial_bridge.c

@@ -217,16 +217,17 @@ void ins_reset_altitude_ref(void) {
   ins_impl.vf_reset = TRUE;
 }
 
-void ins_propagate(void) {
+void ins_propagate(float dt) {
   /* untilt accels */
   struct Int32Vect3 accel_meas_body;
-  INT32_RMAT_TRANSP_VMULT(accel_meas_body, imu.body_to_imu_rmat, imu.accel);
+  struct Int32RMat *body_to_imu_rmat = orientationGetRMat_i(&imu.body_to_imu);
+  int32_rmat_transp_vmult(&accel_meas_body, body_to_imu_rmat, &imu.accel);
   struct Int32Vect3 accel_meas_ltp;
-  INT32_RMAT_TRANSP_VMULT(accel_meas_ltp, (*stateGetNedToBodyRMat_i()), accel_meas_body);
+  int32_rmat_transp_vmult(&accel_meas_ltp, stateGetNedToBodyRMat_i(), &accel_meas_body);
 
   float z_accel_meas_float = ACCEL_FLOAT_OF_BFP(accel_meas_ltp.z);
   if (ins_impl.baro_initialized) {
-    vff_propagate(z_accel_meas_float);
+    vff_propagate(z_accel_meas_float, dt);
     ins_update_from_vff();
   }
   else { // feed accel from the sensors
@@ -358,8 +359,8 @@ static void sonar_cb(uint8_t __attribute__((unused)) sender_id, const float *dis
 static void ins_init_origin_from_flightplan(void) {
 
   struct LlaCoor_i llh_nav0; /* Height above the ellipsoid */
-  llh_nav0.lat = INT32_RAD_OF_DEG(NAV_LAT0);
-  llh_nav0.lon = INT32_RAD_OF_DEG(NAV_LON0);
+  llh_nav0.lat = NAV_LAT0;
+  llh_nav0.lon = NAV_LON0;
   /* NAV_ALT0 = ground alt above msl, NAV_MSL0 = geoid-height (msl) over ellipsoid */
   llh_nav0.alt = NAV_ALT0 + NAV_MSL0;
 

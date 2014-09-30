@@ -2,7 +2,7 @@
 #
 # lisa_mx_2.0.makefile
 #
-# http://paparazzi.enac.fr/wiki/Lisa/M_v20
+# http://wiki.paparazziuav.org/wiki/Lisa/M_v20
 #
 
 BOARD=lisa_mx
@@ -19,7 +19,7 @@ $(TARGET).LDSCRIPT=$(SRC_ARCH)/lisa-mx.ld
 
 # default flash mode is via usb dfu bootloader (luftboot)
 # other possibilities: DFU-UTIL, SWD, JTAG_BMP, STLINK, SERIAL
-FLASH_MODE ?= DFU-UTIL
+FLASH_MODE ?= SWD
 
 
 #

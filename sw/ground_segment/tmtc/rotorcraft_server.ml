@@ -44,6 +44,7 @@ let fvalue = fun x ->
   match x with
       Pprz.Float x -> x
     | Pprz.Int32 x -> Int32.to_float x
+    | Pprz.Int64 x -> Int64.to_float x
     | Pprz.Int x -> float_of_int x
     | _ -> failwith (sprintf "Receive.log_and_parse: float expected, got '%s'" (Pprz.string_of_value x))
 
@@ -52,6 +53,7 @@ let ivalue = fun x ->
   match x with
       Pprz.Int x -> x
     | Pprz.Int32 x -> Int32.to_int x
+    | Pprz.Int64 x -> Int64.to_int x
     | _ -> failwith "Receive.log_and_parse: int expected"
 
 (*
@@ -205,7 +207,7 @@ let log_and_parse = fun ac_name (a:Aircraft.aircraft) msg values ->
       a.cur_block <- ivalue "cur_block";
       a.cur_stage <- ivalue "cur_stage";
       a.horizontal_mode <- check_index (ivalue "horizontal_mode") horiz_modes "AP_HORIZ";
-  (*a.dist_to_wp <- sqrt (fvalue "dist2_wp")*)
+      a.dist_to_wp <- (try fvalue "dist_wp" with _ -> 0.);
     | "WP_MOVED_ENU" ->
       begin
         match a.nav_ref with

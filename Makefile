@@ -27,7 +27,7 @@ ifeq ($(Q),@)
 MAKEFLAGS += --no-print-directory
 endif
 
-PAPARAZZI_SRC=$(shell pwd)
+PAPARAZZI_SRC ?= $(shell pwd)
 empty=
 space=$(empty) $(empty)
 ifneq ($(findstring $(space),$(PAPARAZZI_SRC)),)
@@ -273,6 +273,7 @@ clean:
 
 cleanspaces:
 	find sw -path sw/ext -prune -o -name '*.[ch]' -exec sed -i {} -e 's/[ \t]*$$//' \;
+	find sw -path sw/ext -prune -o -name '*.py' -exec sed -i {} -e 's/[ \t]*$$//' \;
 	find conf -name '*.makefile' -exec sed -i {} -e 's/[ \t]*$$//' ';'
 	find . -path ./sw/ext -prune -o -name Makefile -exec sed -i {} -e 's/[ \t]*$$//' ';'
 	find sw -name '*.ml' -o -name '*.mli' -exec sed -i {} -e 's/[ \t]*$$//' ';'
