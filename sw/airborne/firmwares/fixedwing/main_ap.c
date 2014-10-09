@@ -37,8 +37,8 @@
 #include "firmwares/fixedwing/main_ap.h"
 #include "mcu.h"
 #include "mcu_periph/sys_time.h"
-
-#include "link_mcu_spi.h"
+#include "inter_mcu.h"
+#include "link_mcu.h"
 
 // Sensors
 #if USE_GPS
@@ -213,7 +213,7 @@ void init_ap( void ) {
   ins_init();
 
   /************* Links initialization ***************/
-#if defined MCU_SPI_LINK || defined MCU_UART_LINK
+#if defined MCU_SPI_LINK || defined MCU_UART_LINK || defined MCU_CAN_LINK
   link_mcu_init();
 #endif
 #if USE_AUDIO_TELEMETRY
@@ -575,7 +575,7 @@ void attitude_loop( void ) {
 
   ap_state->commands[COMMAND_PITCH] = h_ctl_elevator_setpoint;
 
-#if defined MCU_SPI_LINK || defined MCU_UART_LINK
+#if defined MCU_SPI_LINK || defined MCU_UART_LINK || defined MCU_CAN_LINK
   link_mcu_send();
 #elif defined INTER_MCU && defined SINGLE_MCU
   /**Directly set the flag indicating to FBW that shared buffer is available*/
@@ -658,7 +658,7 @@ void monitor_task( void ) {
 void event_task_ap( void ) {
 
 #ifndef SINGLE_MCU
-#if USE_I2C0  || USE_I2C1  || USE_I2C2
+#if USE_I2C0 || USE_I2C1 || USE_I2C2 || USE_I2C3
   i2c_event();
 #endif
 #endif
@@ -737,7 +737,7 @@ PRINT_CONFIG_VAR(AHRS_CORRECT_FREQUENCY)
   const float dt = 1./AHRS_CORRECT_FREQUENCY;
 #endif
 
-  ImuScaleAccel(imu);
+  imu_scale_accel(&imu);
   if (ahrs.status != AHRS_UNINIT) {
     ahrs_update_accel(dt);
   }
@@ -761,7 +761,7 @@ PRINT_CONFIG_VAR(AHRS_PROPAGATE_FREQUENCY)
 
   ahrs_timeout_counter = 0;
 
-  ImuScaleGyro(imu);
+  imu_scale_gyro(&imu);
 
 #if USE_AHRS_ALIGNER
   // Run aligner on raw data as it also makes averages.
@@ -803,7 +803,7 @@ PRINT_CONFIG_VAR(AHRS_MAG_CORRECT_FREQUENCY)
   const float dt = 1. / (AHRS_MAG_CORRECT_FREQUENCY);
 #endif
 
-  ImuScaleMag(imu);
+  imu_scale_mag(&imu);
   if (ahrs.status == AHRS_RUNNING) {
     ahrs_update_mag(dt);
   }

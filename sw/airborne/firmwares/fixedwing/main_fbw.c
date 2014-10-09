@@ -48,17 +48,14 @@
 #include "subsystems/datalink/telemetry.h"
 #endif
 
-#ifdef MCU_SPI_LINK
-#include "link_mcu_spi.h"
-#endif
-
-#ifdef MCU_UART_LINK
-#include "link_mcu_usart.h"
+#ifdef FBW_DATALINK
+#include "firmwares/fixedwing/fbw_datalink.h"
 #endif
 
 uint8_t fbw_mode;
 
 #include "inter_mcu.h"
+#include "link_mcu.h"
 
 #ifdef USE_NPS
 #include "nps_autopilot.h"
@@ -130,8 +127,10 @@ void init_fbw( void ) {
 #ifdef INTER_MCU
   inter_mcu_init();
 #endif
-#ifdef MCU_SPI_LINK
+#if defined MCU_SPI_LINK || defined MCU_CAN_LINK
   link_mcu_init();
+#endif
+#ifdef MCU_SPI_LINK
   link_mcu_restart();
 #endif
 
@@ -185,7 +184,9 @@ void event_task_fbw( void) {
   RadioControlEvent(handle_rc_frame);
 #endif
 
+#if USE_I2C0 || USE_I2C1 || USE_I2C2 || USE_I2C3
   i2c_event();
+#endif
 
 #ifdef INTER_MCU
 #if defined MCU_SPI_LINK | defined MCU_UART_LINK
@@ -268,7 +269,11 @@ void event_task_fbw( void) {
     #if OUTBACK_CHALLENGE_VERY_DANGEROUS_RULE_AP_CAN_FORCE_FAILSAFE
     if (crash == 1)
     {
-      for (;;) {}
+      for (;;) {
+#if FBW_DATALINK
+        fbw_datalink_event();
+#endif
+      }
     }
     #endif
 
@@ -285,11 +290,18 @@ void event_task_fbw( void) {
 #endif /* MCU_SPI_LINK */
 #endif /* INTER_MCU */
 
+#ifdef FBW_DATALINK
+  fbw_datalink_event();
+#endif
 }
 
 
 /************* PERIODIC ******************************************************/
 void periodic_task_fbw( void ) {
+
+#ifdef FBW_DATALINK
+  fbw_datalink_periodic();
+#endif
 
 #ifdef RADIO_CONTROL
   radio_control_periodic_task();
@@ -313,6 +325,11 @@ void periodic_task_fbw( void ) {
 #endif
 
 #ifdef MCU_UART_LINK
+  inter_mcu_fill_fbw_state();
+  link_mcu_periodic_task();
+#endif
+
+#ifdef MCU_CAN_LINK
   inter_mcu_fill_fbw_state();
   link_mcu_periodic_task();
 #endif

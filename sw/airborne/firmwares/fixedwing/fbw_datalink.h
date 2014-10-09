@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010-2012 The Paparazzi Team
+ * Copyright (C) 2014 Christophe De Wagter
  *
  * This file is part of paparazzi.
  *
@@ -19,33 +19,14 @@
  */
 
 /**
- * @file link_mcu_usart.h
- * Transport for the communication between FBW and AP via UART.
- *
+ * @file fbw_datalink.h
+ * Handling of messages coming from ground in FTD
  */
 
-#ifndef LINK_MCU_USART_H
-#define LINK_MCU_USART_H
+#ifndef FBW_DATALINK_H
+#define FBW_DATALINK_H
 
-#include <inttypes.h>
-#include "inter_mcu.h"
+extern void fbw_datalink_periodic(void);
+extern void fbw_datalink_event(void);
 
-struct link_mcu_msg {
-  union  {
-    struct fbw_state from_fbw;
-    struct ap_state  from_ap;
-  } payload;
-};
-
-extern struct link_mcu_msg link_mcu_from_ap_msg;
-extern struct link_mcu_msg link_mcu_from_fbw_msg;
-
-extern bool_t link_mcu_received;
-
-extern void link_mcu_send( void );
-extern void link_mcu_init( void );
-extern void link_mcu_event_task( void );
-extern void link_mcu_periodic_task( void );
-
-
-#endif /* LINK_MCU_USART_H */
+#endif /* FBW_DATALINK_H */
