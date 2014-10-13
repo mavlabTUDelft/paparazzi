@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Freek van Tienen <freek.v.tienen@gmail.com>
+ * Copyright (C) 2010 Eric Parsonage <eric@eparsonage.com>
  *
  * This file is part of paparazzi.
  *
@@ -14,26 +14,27 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with paparazzi; see the file COPYING.  If not, see
- * <http://www.gnu.org/licenses/>.
+ * along with paparazzi; see the file COPYING.  If not, write to
+ * the Free Software Foundation, 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ *
  */
 
-/**
- * @file subsystems/radio_control/superbitrf_rc.h
- * DSM2 and DSMX radio control implementation for the cyrf6936 2.4GHz radio chip trough SPI
+#ifndef RADIO_CONTROL_SPEKTRUM_ARCH_H
+#define RADIO_CONTROL_SPEKTRUM_ARCH_H
+
+
+/*
+ * All Spektrum and JR 2.4 GHz transmitters
+ * have the same channel assignments.
  */
 
-#ifndef RADIO_CONTROL_SUPERBITRF_RC_H
-#define RADIO_CONTROL_SUPERBITRF_RC_H
 
-#include "subsystems/datalink/superbitrf.h"
-
-/* Theoretically you could have 14 channel over DSM2/DSMX */
 #ifndef RADIO_CONTROL_NB_CHANNEL
-#define RADIO_CONTROL_NB_CHANNEL 14
+#define RADIO_CONTROL_NB_CHANNEL 12
 #endif
 
-/* The channel ordering is always the same for DSM2 and DSMX */
+/* channel assignments */
 #define RADIO_THROTTLE   0
 #define RADIO_ROLL       1
 #define RADIO_PITCH      2
@@ -47,20 +48,17 @@
 #define RADIO_AUX5       9
 #define RADIO_AUX6       10
 #define RADIO_AUX7       11
-#define RADIO_AUX8       12
-#define RADIO_AUX9       13
 
-/* Map the MODE default to the gear switch */
+/* really for a 9 channel transmitter
+   we would swap the order of these */
 #ifndef RADIO_MODE
 #define RADIO_MODE       RADIO_GEAR
 #endif
 
-/**
- * RC event function with handler callback.
- */
-extern void radio_control_impl_event(void (* _received_frame_handler)(void));
+extern void RadioControlEventImp(void (*_received_frame_handler)(void));
 
-/* The radio control event handler */
-#define RadioControlEvent(_received_frame_handler) radio_control_impl_event(_received_frame_handler)
+#if USE_NPS
+extern void radio_control_feed(void);
+#endif
 
-#endif /* RADIO_CONTROL_SUPERBITRF_RC_H */
+#endif /* RADIO_CONTROL_SPEKTRUM_ARCH_H */
