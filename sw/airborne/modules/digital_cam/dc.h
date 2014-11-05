@@ -45,6 +45,9 @@
 /** number of images taken since the last change of dc_mode */
 extern uint16_t dc_gps_count;
 
+/** export the number of the last photo */
+extern uint16_t dc_photo_nr;
+
 /** distance between dc shots in meters */
 extern float dc_gps_dist;
 
@@ -184,7 +187,7 @@ extern uint8_t dc_circle(float interval, float start);
  * If both 'x' and 'y' are DC_IGNORE the current position
  * will be used as reference point.
  *
- * @param interval minimum angle between shots in deg
+ * @param interval distance between shots in meters
  * @param x x coordinate of reference point (or special DC_IGNORE)
  * @param y y coordinate of reference point (or special DC_IGNORE)
  * @return zero
