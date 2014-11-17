@@ -77,12 +77,13 @@
     <define name="ACCEL_Z_NEUTRAL" value="0"/>
 
     <!-- MAGNETO CALIBRATION DELFT -->
-    <define name="MAG_X_NEUTRAL" value="286"/>
-    <define name="MAG_Y_NEUTRAL" value="-72"/>
-    <define name="MAG_Z_NEUTRAL" value="97"/>
-    <define name="MAG_X_SENS" value="3.94431833863" integer="16"/>
-    <define name="MAG_Y_SENS" value="4.14629702271" integer="16"/>
-    <define name="MAG_Z_SENS" value="4.54518768636" integer="16"/>
+    <define name="MAG_X_NEUTRAL" value="-698"/>
+    <define name="MAG_Y_NEUTRAL" value="-862"/>
+    <define name="MAG_Z_NEUTRAL" value="393"/>
+    <define name="MAG_X_SENS" value="3.40609464013" integer="16"/>
+    <define name="MAG_Y_SENS" value="3.88071743974" integer="16"/>
+    <define name="MAG_Z_SENS" value="4.09977943787" integer="16"/>
+
 
     <!-- MAGNETO CURRENT CALIBRATION -->
     <define name="MAG_X_CURRENT_COEF" value="0.0103422023767"/>
@@ -214,7 +215,7 @@
         <!--define name="RADIO_TRANSMITTER_CHAN" value="6"/-->
         <!--define name="RADIO_TRANSMITTER_PROTOCOL" value="0x01"/-->
         <define name="RADIO_MODE" value="RADIO_FLAP"/>
-        <define name="RADIO_KILL_SWITCH" value="RADIO_GEAR"/>
+        <define name="RADIO_KILL_SWITCH" value="6"/>
       </subsystem>
 
       <configure name="AHRS_PROPAGATE_FREQUENCY" value="500"/>
