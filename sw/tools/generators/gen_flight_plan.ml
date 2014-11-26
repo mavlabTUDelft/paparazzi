@@ -285,8 +285,8 @@ let rec print_stage = fun index_of_waypoints x ->
     match String.lowercase (Xml.tag x) with
         "return" ->
           stage ();
-          lprintf "Return()\n";
-          lprintf "break\n";
+          lprintf "Return();\n";
+          lprintf "break;\n"
       | "goto" ->
         stage ();
         lprintf "Goto(%s)\n" (name_of x)
@@ -490,8 +490,7 @@ let rec print_stage = fun index_of_waypoints x ->
         let var = ExtXml.attrib  x "var"
         and value = parsed_attrib  x "value" in
         lprintf "%s = %s;\n" var value;
-        lprintf "NextStageAndBreak();\n";
-        lprintf "break;\n"
+        lprintf "NextStage();\n"
       | "call" ->
         stage ();
         let statement = ExtXml.attrib  x "fun" in
